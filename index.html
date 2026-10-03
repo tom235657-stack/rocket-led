@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#E6EDF2">
+<title>Светодиод ROCKET-LED</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap">
+<style>
+  :root {
+    --ground: #E6EDF2;
+    --panel: #F7FAFC;
+    --ink: #12263A;
+    --muted: #4A6075;
+    --line: #C5D3DF;
+    --led-on: #1E6BFF;
+    --led-off: #B9C8D6;
+    --ok: #1B7F4B;
+    --bad: #B3261E;
+    --period: 500ms;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+    display: flex;
+    justify-content: center;
+  }
+  main { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 20px; }
+
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  h1 { margin: 0; font-size: 22px; font-weight: 800; }
+  .status {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-radius: 999px;
+    background: var(--panel); border: 1px solid var(--line);
+    font-size: 14px; font-weight: 600; color: var(--muted);
+  }
+  .status i { width: 10px; height: 10px; border-radius: 50%; background: var(--led-off); }
+  .status.on { color: var(--ok); }
+  .status.on i { background: var(--ok); }
+
+  /* Индикатор: мигает с тем же периодом, что и светодиод на плате */
+  .stage {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 24px;
+    padding: 28px 20px 24px; display: flex; flex-direction: column; align-items: center; gap: 18px;
+  }
+  .led {
+    width: 132px; height: 132px; border-radius: 50%;
+    background: var(--led-off);
+    animation: blink var(--period) steps(1, end) infinite;
+    box-shadow: inset 0 0 0 6px rgba(255,255,255,.35);
+  }
+  .led.paused { animation: none; }
+  @keyframes blink {
+    0%   { background: var(--led-on); box-shadow: 0 0 0 14px rgba(30,107,255,.18), 0 0 46px 10px rgba(30,107,255,.45), inset 0 0 0 6px rgba(255,255,255,.35); }
+    50%  { background: var(--led-off); box-shadow: inset 0 0 0 6px rgba(255,255,255,.35); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .led { animation-duration: 2s; }
+  }
+  .readout { text-align: center; }
+  .readout .big { font-size: 64px; font-weight: 800; line-height: 1; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+  .readout .big small { font-size: 24px; font-weight: 600; margin-left: 6px; color: var(--muted); letter-spacing: 0; }
+  .readout .hz { margin-top: 6px; font-size: 16px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .control { background: var(--panel); border: 1px solid var(--line); border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .step {
+    flex: none; width: 48px; height: 48px; border-radius: 14px;
+    border: 1px solid var(--ink); background: transparent; color: var(--ink);
+    font: inherit; font-size: 24px; font-weight: 600; cursor: pointer;
+  }
+  .step:active { background: var(--ink); color: var(--panel); }
+
+  input[type=range] { flex: 1; min-width: 0; height: 48px; margin: 0; background: transparent; accent-color: var(--led-on); }
+  input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: var(--line); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; margin-top: -11px; border-radius: 50%; background: var(--ink); border: 4px solid var(--panel); box-shadow: 0 0 0 1px var(--ink); }
+  input[type=range]::-moz-range-track { height: 8px; border-radius: 4px; background: var(--line); }
+  input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--ink); border: 4px solid var(--panel); }
+  .scale { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); padding: 0 4px; }
+
+  .presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .presets button {
+    height: 44px; border-radius: 12px; border: 1px solid var(--line); background: transparent;
+    color: var(--ink); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .presets button[aria-pressed=true] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+
+  .connect {
+    height: 56px; border: none; border-radius: 16px; background: var(--led-on); color: #fff;
+    font: inherit; font-size: 17px; font-weight: 800; cursor: pointer;
+  }
+  .connect.secondary { background: transparent; color: var(--ink); border: 1px solid var(--ink); font-weight: 600; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--led-on); outline-offset: 2px; }
+
+  .msg { min-height: 20px; font-size: 14px; color: var(--muted); text-align: center; }
+  .msg.err { color: var(--bad); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Светодиод платы</h1>
+    <div class="status" id="status" role="status"><i></i><span id="statusText">Не подключено</span></div>
+  </header>
+
+  <section class="stage" aria-label="Индикатор мигания">
+    <div class="led" id="led"></div>
+    <div class="readout">
+      <div class="big"><span id="ms">500</span><small>мс</small></div>
+      <div class="hz" id="hz">2,00 мигания в секунду</div>
+    </div>
+  </section>
+
+  <section class="control">
+    <label for="slider" style="font-weight:600">Период мигания</label>
+    <div class="row">
+      <button class="step" id="minus" aria-label="Уменьшить период на 10 мс">−</button>
+      <input type="range" id="slider" min="10" max="1000" step="1" value="500">
+      <button class="step" id="plus" aria-label="Увеличить период на 10 мс">+</button>
+    </div>
+    <div class="scale"><span>10 мс · быстро</span><span>медленно · 1000 мс</span></div>
+    <div class="presets" id="presets">
+      <button data-v="10">10</button>
+      <button data-v="100">100</button>
+      <button data-v="500">500</button>
+      <button data-v="1000">1000</button>
+    </div>
+  </section>
+
+  <button class="connect" id="connect">Подключиться к плате</button>
+  <div class="msg" id="msg"></div>
+</main>
+
+<script>
+(() => {
+  const SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+  const RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+  const TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+  const MIN = 10, MAX = 1000;
+
+  const $ = (id) => document.getElementById(id);
+  const slider = $('slider'), msEl = $('ms'), hzEl = $('hz'), led = $('led');
+  const statusEl = $('status'), statusText = $('statusText'), connectBtn = $('connect'), msgEl = $('msg');
+
+  let device = null, rxChar = null, sendTimer = null, busy = false, pending = null;
+
+  function say(text, isErr) { msgEl.textContent = text || ''; msgEl.classList.toggle('err', !!isErr); }
+
+  function setValue(v) {
+    v = Math.max(MIN, Math.min(MAX, Math.round(v)));
+    slider.value = v;
+    msEl.textContent = v;
+    const hz = 1000 / v;
+    hzEl.textContent = hz.toFixed(2).replace('.', ',') + ' ' + plural(hz);
+    document.documentElement.style.setProperty('--period', v + 'ms');
+    // перезапуск анимации, чтобы она сразу шла с новым периодом
+    led.style.animation = 'none'; void led.offsetWidth; led.style.animation = '';
+    document.querySelectorAll('#presets button').forEach(b =>
+      b.setAttribute('aria-pressed', String(+b.dataset.v === v)));
+    queueSend(v);
+    return v;
+  }
+
+  function plural(hz) {
+    return 'мигания в секунду';
+  }
+
+  // Отправка: не чаще раза в ~60 мс, всегда уходит последнее значение
+  function queueSend(v) {
+    pending = v;
+    if (!rxChar || sendTimer) return;
+    sendTimer = setTimeout(flush, 60);
+  }
+  async function flush() {
+    sendTimer = null;
+    if (!rxChar || pending === null || busy) {
+      if (pending !== null && busy) sendTimer = setTimeout(flush, 30);
+      return;
+    }
+    const v = pending; pending = null; busy = true;
+    try {
+      await rxChar.writeValue(new TextEncoder().encode(String(v)));
+    } catch (e) {
+      say('Не удалось отправить значение: ' + e.message, true);
+    } finally {
+      busy = false;
+      if (pending !== null && !sendTimer) sendTimer = setTimeout(flush, 30);
+    }
+  }
+
+  function setConnected(on) {
+    statusEl.classList.toggle('on', on);
+    statusText.textContent = on ? 'ROCKET-LED подключена' : 'Не подключено';
+    connectBtn.textContent = on ? 'Отключиться' : 'Подключиться к плате';
+    connectBtn.classList.toggle('secondary', on);
+  }
+
+  async function connect() {
+    if (!navigator.bluetooth) {
+      say('Этот браузер не поддерживает Web Bluetooth. Откройте страницу в Chrome на Android или на компьютере, по адресу https://', true);
+      return;
+    }
+    try {
+      say('Выберите плату в списке…');
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [SERVICE] }, { namePrefix: 'ROCKET' }],
+        optionalServices: [SERVICE]
+      });
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+      say('Подключаюсь…');
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE);
+      rxChar = await service.getCharacteristic(RX);
+      const tx = await service.getCharacteristic(TX);
+      await tx.startNotifications();
+      tx.addEventListener('characteristicvaluechanged', (e) => {
+        const text = new TextDecoder().decode(e.target.value);
+        if (text.startsWith('OK,')) say('Плата подтвердила: ' + text.slice(3) + ' мс');
+      });
+      setConnected(true);
+      say('Готово. Двигайте ползунок.');
+      pending = +slider.value;
+      flush();
+    } catch (e) {
+      rxChar = null;
+      setConnected(false);
+      if (e.name === 'NotFoundError') say('Плата не выбрана.', false);
+      else say('Ошибка подключения: ' + e.message, true);
+    }
+  }
+
+  function onDisconnected() {
+    rxChar = null;
+    setConnected(false);
+    say('Связь потеряна. Нажмите «Подключиться к плате».', true);
+  }
+
+  function disconnect() {
+    if (device && device.gatt.connected) device.gatt.disconnect();
+  }
+
+  connectBtn.addEventListener('click', () => (rxChar ? disconnect() : connect()));
+  slider.addEventListener('input', () => setValue(+slider.value));
+  $('minus').addEventListener('click', () => setValue(+slider.value - 10));
+  $('plus').addEventListener('click', () => setValue(+slider.value + 10));
+  $('presets').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (b) setValue(+b.dataset.v);
+  });
+
+  setValue(500);
+  say('Индикатор выше мигает с выбранным периодом даже без платы.');
+})();
+</script>
+</body>
+</html>
